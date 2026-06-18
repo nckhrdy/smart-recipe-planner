@@ -33,6 +33,10 @@ The 5 generated recipes from the latest photo, plus **Refresh** for a new (non-r
 - **Tap to expand** a short view of the required ingredients (a peek, without leaving the list)
 - Tapping the card opens the **Recipe Detail**
 
+**Refresh states** ([ADR-0004](../architecture/decisions/0004-no-repeat-across-refreshes.md)):
+- **Empty** (before first photo) — "Snap something to get started," pointing at the camera.
+- **Exhaustion** — when the ingredient set can't yield 5 genuinely-new recipes, show *"You've explored these — add an ingredient or start over."* A defined state, not an error.
+
 **Deferred:** card thumbnails — text-only for now; revisit *after* the core flow works (idea: pull visuals from an open-source recipe/ingredient image set rather than generating them). **Open:** one-line hook under the title?
 
 ---
