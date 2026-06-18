@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Smart Recipe Planner — My Recipes (design)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --cream:#F0E9DA; --surface:#FFFCF6; --ink:#22203B; --blue:#3A41D6; --blue-deep:#2B309E;
+    --orange:#E5531B; --soft:#E7E8FB; --muted:#8A8475; --border:#ECE4D3; --line:#F0EBE0;
+    --round:'Fredoka',system-ui,sans-serif; --sans:'Hanken Grotesk',system-ui,sans-serif;
+  }
+  * { box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  body { margin:0; padding:40px 20px 64px; background:#15151a; color:#e9e9ee; font-family:var(--sans); display:flex; flex-direction:column; align-items:center; gap:24px; }
+  .caption { max-width:420px; text-align:center; }
+  .caption h1 { font-size:20px; font-weight:600; margin:0 0 6px; }
+  .caption p { color:#9a9aa4; margin:0; font-size:13.5px; line-height:1.55; }
+
+  .phone { position:relative; width:393px; height:830px;
+    background:var(--cream) url("assets/recipe-background.svg") top center / cover no-repeat;
+    border-radius:46px; border:10px solid #0c0c0f; overflow:hidden; box-shadow:0 30px 80px rgba(0,0,0,.55); }
+  .screen { position:absolute; inset:0; overflow-y:auto; padding-bottom:100px; }
+  .screen::-webkit-scrollbar { display:none; }
+  .statusbar { display:flex; justify-content:space-between; align-items:center; padding:14px 26px 2px; font-size:13px; font-weight:700; color:var(--ink); }
+  .statusbar svg { width:16px; height:16px; }
+
+  .hd { padding:10px 22px 4px; }
+  .hd .over { text-transform:uppercase; letter-spacing:.16em; font-size:11px; font-weight:700; color:var(--blue); margin:0 0 6px; }
+  .hd h1 { font-family:var(--round); font-size:33px; font-weight:600; color:var(--blue); margin:0; line-height:1; }
+  .hd .count { font-size:13.5px; color:var(--muted); font-weight:600; margin:8px 0 0; }
+
+  .search { margin:14px 20px 0; display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:12px 14px; color:var(--muted); font-size:14px; font-weight:500; }
+  .search svg { width:18px; height:18px; color:var(--muted); }
+
+  .filters { display:flex; gap:8px; padding:14px 20px 2px; overflow-x:auto; }
+  .filters::-webkit-scrollbar { display:none; }
+  .filter { font-size:13px; font-weight:700; padding:8px 15px; border-radius:999px; border:1.5px solid var(--border); color:var(--ink); background:transparent; white-space:nowrap; cursor:pointer; }
+  .filter.on { background:var(--blue); border-color:var(--blue); color:#fff; }
+
+  .cards { padding:12px 18px 0; display:flex; flex-direction:column; gap:12px; }
+  .rcard { background:var(--surface); border:1px solid var(--border); border-radius:22px; padding:16px 17px; box-shadow:0 6px 18px rgba(40,35,80,.05); cursor:pointer; }
+  .rcard-top { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+  .rcard h3 { font-size:18px; color:var(--ink); margin:0; font-weight:800; line-height:1.15; letter-spacing:-.2px; }
+  .rcard .hook { font-size:13px; color:var(--muted); margin:5px 0 0; font-weight:500; line-height:1.4; }
+  .save { width:38px; height:38px; border-radius:50%; flex:none; display:grid; place-items:center; background:var(--blue); border:1.5px solid var(--blue); color:#fff; cursor:pointer; }
+  .save svg { width:18px; height:18px; }
+  .row { display:flex; align-items:center; gap:10px; margin-top:12px; flex-wrap:wrap; }
+  .tag { font-size:11.5px; font-weight:700; padding:4px 11px; border-radius:999px; background:var(--soft); color:var(--blue-deep); }
+  .meta { display:inline-flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink); font-weight:600; }
+  .meta svg { width:14px; height:14px; color:var(--blue); }
+  .dot { width:3px; height:3px; border-radius:50%; background:var(--muted); }
+
+  /* empty state */
+  .empty { display:none; flex-direction:column; align-items:center; text-align:center; padding:70px 40px 0; }
+  .empty.show { display:flex; }
+  .empty h2 { font-family:var(--round); font-size:22px; color:var(--blue); margin:18px 0 6px; font-weight:600; }
+  .empty p { font-size:14px; color:var(--muted); margin:0 0 20px; line-height:1.5; font-weight:500; }
+  .empty .go { background:var(--blue); color:#fff; border:none; font-family:var(--sans); font-weight:700; font-size:14.5px; padding:13px 22px; border-radius:14px; display:inline-flex; align-items:center; gap:8px; }
+  .empty .go svg { width:17px; height:17px; }
+
+  /* nav */
+  .nav { position:absolute; bottom:0; left:0; right:0; height:84px; background:rgba(255,252,246,.92); backdrop-filter:blur(12px); border-top:1px solid var(--border); display:flex; align-items:flex-start; justify-content:space-around; padding:12px 14px 0; }
+  .nav a { display:flex; flex-direction:column; align-items:center; gap:4px; font-size:10px; font-weight:700; color:var(--muted); width:56px; }
+  .nav a.active { color:var(--blue); }
+  .nav a svg { width:23px; height:23px; }
+  .fab { width:62px; height:62px; border-radius:50%; background:var(--blue); color:#fff; display:grid; place-items:center; margin-top:-20px; box-shadow:0 10px 24px rgba(58,65,214,.42); border:4px solid var(--cream); }
+  .fab svg { width:27px; height:27px; }
+</style>
+</head>
+<body>
+  <div class="caption">
+    <h1>My Recipes — design pass</h1>
+    <p>Saved keepers, reusing the recipe card (compact, no "01" index). Tap a card → detail; tap the filled bookmark to un-save (count updates; empty state appears when you clear them all). Search + filters at top.</p>
+  </div>
+
+  <div class="phone">
+    <div class="screen">
+      <div class="statusbar"><span>9:41</span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 17h2v3H2zM6 13h2v7H6zM10 9h2v11h-2zM14 5h2v15h-2zM18 9h2v11h-2z"/></svg></div>
+
+      <div class="hd">
+        <p class="over">Saved</p>
+        <h1>My Recipes</h1>
+        <p class="count"><span id="n">5</span> recipes kept</p>
+      </div>
+
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+        Search your recipes
+      </div>
+
+      <div class="filters">
+        <button class="filter on">All</button>
+        <button class="filter">Vegetarian</button>
+        <button class="filter">Under 30 min</button>
+        <button class="filter">Breakfast</button>
+      </div>
+
+      <div class="cards" id="cards">
+        <div class="rcard">
+          <div class="rcard-top">
+            <div><h3>Spinach &amp; Tomato Frittata</h3><p class="hook">Fluffy baked eggs, a fridge-clear-out classic.</p></div>
+            <button class="save"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4.5h12v15l-6-4-6 4z"/></svg></button>
+          </div>
+          <div class="row"><span class="tag">Vegetarian</span><span class="meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l2.5 1.5"/></svg>30 min</span><span class="dot"></span><span class="meta">Serves 4</span></div>
+        </div>
+
+        <div class="rcard">
+          <div class="rcard-top">
+            <div><h3>Garlic Butter Chicken Pasta</h3><p class="hook">Silky weeknight pasta in half an hour.</p></div>
+            <button class="save"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4.5h12v15l-6-4-6 4z"/></svg></button>
+          </div>
+          <div class="row"><span class="meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l2.5 1.5"/></svg>40 min</span><span class="dot"></span><span class="meta">Serves 3</span></div>
+        </div>
+
+        <div class="rcard">
+          <div class="rcard-top">
+            <div><h3>Cherry Tomato &amp; Spinach Orzo</h3><p class="hook">One pot, bright and herby, minimal cleanup.</p></div>
+            <button class="save"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4.5h12v15l-6-4-6 4z"/></svg></button>
+          </div>
+          <div class="row"><span class="tag">Vegetarian</span><span class="meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l2.5 1.5"/></svg>28 min</span><span class="dot"></span><span class="meta">Serves 2</span></div>
+        </div>
+
+        <div class="rcard">
+          <div class="rcard-top">
+            <div><h3>Banana Oat Pancakes</h3><p class="hook">Five-ingredient breakfast, naturally sweet.</p></div>
+            <button class="save"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4.5h12v15l-6-4-6 4z"/></svg></button>
+          </div>
+          <div class="row"><span class="tag">Breakfast</span><span class="meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l2.5 1.5"/></svg>20 min</span><span class="dot"></span><span class="meta">Serves 2</span></div>
+        </div>
+
+        <div class="rcard">
+          <div class="rcard-top">
+            <div><h3>One-Pan Lemon Chicken</h3><p class="hook">Bright, golden, and barely any washing up.</p></div>
+            <button class="save"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4.5h12v15l-6-4-6 4z"/></svg></button>
+          </div>
+          <div class="row"><span class="meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l2.5 1.5"/></svg>45 min</span><span class="dot"></span><span class="meta">Serves 4</span></div>
+        </div>
+      </div>
+
+      <div class="empty" id="empty">
+        <svg width="76" height="62" viewBox="0 0 64 54" fill="none" stroke="#3A41D6" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" opacity=".8">
+          <path d="M18 8h28v40l-14-9-14 9z"/><path d="M26 22h12M26 29h8"/>
+        </svg>
+        <h2>No saved recipes yet</h2>
+        <p>Tap the bookmark on any recipe<br>to keep it here for later.</p>
+        <button class="go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2L8 5h8l1.5 2h2A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"/><circle cx="12" cy="13" r="3.4"/></svg>Find a recipe</button>
+      </div>
+    </div>
+
+    <div class="nav">
+      <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-7 8 7M6 10v9h5v-6h2v6h5v-9"/></svg>Home</a>
+      <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="7" rx="2"/><rect x="4" y="14" width="16" height="6" rx="2"/></svg>Recipes</a>
+      <a><span class="fab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2L8 5h8l1.5 2h2A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"/><circle cx="12" cy="13" r="3.4"/></svg></span></a>
+      <a class="active"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M6 4h12v16l-6-4-6 4z"/></svg>My Recipes</a>
+      <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>Profile</a>
+    </div>
+  </div>
+
+  <script>
+    const cards = document.getElementById('cards');
+    const nEl = document.getElementById('n');
+    const empty = document.getElementById('empty');
+    cards.addEventListener('click', e => {
+      const save = e.target.closest('.save');
+      if (!save) return;
+      e.stopPropagation();
+      save.closest('.rcard').remove();
+      const left = cards.querySelectorAll('.rcard').length;
+      nEl.textContent = left;
+      if (left === 0) empty.classList.add('show');
+    });
+    document.querySelectorAll('.filter').forEach(f => f.addEventListener('click', () => {
+      document.querySelectorAll('.filter').forEach(x => x.classList.remove('on'));
+      f.classList.add('on');
+    }));
+  </script>
+</body>
+</html>

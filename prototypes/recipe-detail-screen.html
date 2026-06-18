@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Smart Recipe Planner — Recipe Detail (design)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --cream:#F0E9DA; --surface:#FFFCF6; --ink:#22203B; --blue:#3A41D6; --blue-deep:#2B309E;
+    --orange:#E5531B; --soft:#E7E8FB; --muted:#8A8475; --border:#ECE4D3; --line:#F0EBE0;
+    --round:'Fredoka',system-ui,sans-serif; --sans:'Hanken Grotesk',system-ui,sans-serif;
+  }
+  * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+  body { margin:0; padding:40px 20px 64px; background:#15151a; color:#e9e9ee; font-family:var(--sans); display:flex; flex-direction:column; align-items:center; gap:24px; }
+  .caption { max-width:420px; text-align:center; }
+  .caption h1 { font-size:20px; font-weight:600; margin:0 0 6px; }
+  .caption p { color:#9a9aa4; margin:0; font-size:13.5px; line-height:1.55; }
+  .caption code { background:#2a2a31; padding:1px 6px; border-radius:5px; font-size:12px; }
+
+  .phone { position:relative; width:393px; height:830px;
+    background:var(--cream) url("assets/recipe-background.svg") top center / cover no-repeat;
+    border-radius:46px; border:10px solid #0c0c0f; overflow:hidden; box-shadow:0 30px 80px rgba(0,0,0,.55); }
+  .screen { position:absolute; inset:0; overflow-y:auto; padding-bottom:30px; }
+  .screen::-webkit-scrollbar { display:none; }
+
+  .statusbar { display:flex; justify-content:space-between; align-items:center; padding:14px 26px 2px; font-size:13px; font-weight:700; color:var(--ink); }
+  .statusbar .icons svg { width:16px; height:16px; }
+
+  .topbar { display:flex; justify-content:space-between; align-items:center; padding:10px 20px 2px; }
+  .icon-btn { width:40px; height:40px; border-radius:50%; display:grid; place-items:center; background:var(--surface); border:1px solid var(--border); color:var(--ink); cursor:pointer; }
+  .icon-btn svg { width:20px; height:20px; }
+  .icon-btn.save { color:var(--blue); }
+  .icon-btn.save.on { background:var(--blue); border-color:var(--blue); color:#fff; }
+
+  .hero { padding:14px 22px 4px; }
+  .hero .over { text-transform:uppercase; letter-spacing:.14em; font-size:11px; font-weight:700; color:var(--blue); margin:0 0 9px; }
+  .hero h2 { font-size:29px; font-weight:800; color:var(--ink); margin:0; line-height:1.08; letter-spacing:-.4px; }
+  .hero .hook { font-size:14px; color:var(--muted); margin:9px 0 0; font-weight:500; line-height:1.45; }
+
+  /* stat strip */
+  .stats { display:flex; margin:16px 20px 0; background:var(--surface); border:1px solid var(--border); border-radius:20px; overflow:hidden; }
+  .stat { flex:1; text-align:center; padding:13px 4px; }
+  .stat + .stat { border-left:1px solid var(--line); }
+  .stat .v { font-size:17px; font-weight:800; color:var(--ink); }
+  .stat .v.accent { color:var(--blue); }
+  .stat .k { font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin-top:3px; }
+
+  .card { margin:14px 20px 0; background:var(--surface); border:1px solid var(--border); border-radius:22px; padding:18px; box-shadow:0 6px 18px rgba(40,35,80,.05); }
+  .card-h { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .card-h .t { font-size:12px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--ink); }
+
+  /* collapsible timer */
+  .timer { margin:14px 20px 0; background:var(--surface); border:1px solid var(--border); border-radius:22px; box-shadow:0 6px 18px rgba(40,35,80,.05); overflow:hidden; }
+  .timer-toggle { display:flex; align-items:center; gap:13px; padding:15px 17px; cursor:pointer; }
+  .timer-toggle .ic { width:40px; height:40px; border-radius:12px; background:var(--soft); color:var(--blue); display:grid; place-items:center; flex:none; }
+  .timer-toggle .ic svg { width:21px; height:21px; }
+  .timer-toggle .tx { flex:1; }
+  .timer-toggle .tx .a { font-size:15px; font-weight:800; color:var(--ink); }
+  .timer-toggle .tx .b { font-size:12.5px; color:var(--muted); font-weight:500; margin-top:1px; }
+  .timer-toggle .chev { color:var(--muted); transition:transform .2s ease; }
+  .timer-toggle .chev svg { width:20px; height:20px; display:block; }
+  .timer.open .chev { transform:rotate(180deg); }
+  .timer-body { display:none; padding:2px 17px 18px; border-top:1px solid var(--line); }
+  .timer.open .timer-body { display:block; }
+  .ring-wrap { position:relative; width:120px; height:120px; margin:16px auto 2px; }
+  .ring-time { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .ring-time .t { font-size:26px; font-weight:800; color:var(--blue); font-variant-numeric:tabular-nums; letter-spacing:-.5px; }
+  .ring-time .u { font-size:9px; color:var(--muted); letter-spacing:.14em; text-transform:uppercase; margin-top:1px; }
+  .presets { display:flex; gap:8px; justify-content:center; margin:12px 0 0; }
+  .preset { font-size:13px; font-weight:700; padding:6px 13px; border-radius:999px; border:1.5px solid var(--border); color:var(--ink); background:transparent; cursor:pointer; }
+  .preset.on { background:var(--blue); border-color:var(--blue); color:#fff; }
+  .start { margin-top:13px; width:100%; padding:13px; border-radius:13px; background:var(--orange); color:#fff; border:none; font-family:var(--sans); font-weight:700; font-size:14.5px; display:flex; align-items:center; justify-content:center; gap:9px; box-shadow:0 4px 12px rgba(229,83,27,.28); cursor:pointer; }
+  .start svg { width:17px; height:17px; }
+
+  /* servings stepper */
+  .serv-wrap { display:flex; align-items:center; gap:9px; }
+  .serv-lbl { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+  .serv { display:flex; align-items:center; border:1.5px solid var(--border); border-radius:999px; }
+  .serv button { width:30px; height:30px; background:transparent; border:none; color:var(--blue); font-size:17px; font-weight:700; display:grid; place-items:center; cursor:pointer; }
+  .serv .n { min-width:24px; text-align:center; font-size:14.5px; font-weight:800; color:var(--ink); }
+
+  /* ingredients — plain list */
+  .ing { display:flex; align-items:baseline; gap:12px; padding:10px 0; border-bottom:1px solid var(--line); }
+  .ing:last-child { border-bottom:none; }
+  .ing .name { flex:1; font-size:14.5px; color:var(--ink); font-weight:600; }
+  .ing .qty { font-size:13px; color:var(--muted); font-weight:600; white-space:nowrap; }
+
+  /* steps */
+  .step { display:flex; gap:13px; padding:11px 0; }
+  .step + .step { border-top:1px solid var(--line); }
+  .num { width:27px; height:27px; border-radius:50%; background:var(--soft); color:var(--blue-deep); flex:none; display:grid; place-items:center; font-family:var(--round); font-weight:600; font-size:13px; margin-top:1px; }
+  .step p { margin:0; font-size:14px; color:var(--ink); line-height:1.5; font-weight:500; }
+
+  .foot { text-align:center; padding:22px 0 6px; }
+</style>
+</head>
+<body>
+  <div class="caption">
+    <h1>Recipe Detail — v2</h1>
+    <p>Timer collapses to a tappable button (press it to expand). Plain ingredient list. Servings stepper on the ingredients — <code>quantities recompute in the build</code>.</p>
+  </div>
+
+  <div class="phone">
+    <div class="screen">
+      <div class="statusbar">
+        <span>9:41</span>
+        <span class="icons"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 17h2v3H2zM6 13h2v7H6zM10 9h2v11h-2zM14 5h2v15h-2zM18 9h2v11h-2z"/></svg></span>
+      </div>
+
+      <div class="topbar">
+        <button class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <button class="icon-btn save on" title="Saved to My Recipes"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4.5h12v15l-6-4-6 4z"/></svg></button>
+      </div>
+
+      <div class="hero">
+        <p class="over">Vegetarian · Easy</p>
+        <h2>Spinach &amp; Tomato Frittata</h2>
+        <p class="hook">Fluffy baked eggs with wilted spinach and blistered cherry tomatoes — a fridge-clear-out classic.</p>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="v">10m</div><div class="k">Prep</div></div>
+        <div class="stat"><div class="v">20m</div><div class="k">Cook</div></div>
+        <div class="stat"><div class="v accent">30m</div><div class="k">Total</div></div>
+      </div>
+
+      <!-- collapsible timer -->
+      <div class="timer">
+        <div class="timer-toggle">
+          <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5M9 2h6"/></svg></span>
+          <span class="tx"><div class="a">Cook timer</div><div class="b">Tap to set a countdown</div></span>
+          <span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+        </div>
+        <div class="timer-body">
+          <div class="ring-wrap">
+            <svg width="120" height="120" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="44" fill="none" stroke="#E7E8FB" stroke-width="7"/>
+              <circle cx="50" cy="50" r="44" fill="none" stroke="#E5531B" stroke-width="7" stroke-linecap="round" stroke-dasharray="276.5" stroke-dashoffset="69" transform="rotate(-90 50 50)"/>
+            </svg>
+            <div class="ring-time"><span class="t">20:00</span><span class="u">minutes</span></div>
+          </div>
+          <div class="presets">
+            <button class="preset">5</button><button class="preset">10</button><button class="preset on">20</button><button class="preset">30</button>
+          </div>
+          <button class="start"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5l12 7-12 7z"/></svg>Start timer</button>
+        </div>
+      </div>
+
+      <!-- ingredients -->
+      <div class="card">
+        <div class="card-h">
+          <span class="t">Ingredients</span>
+          <div class="serv-wrap">
+            <span class="serv-lbl">Serves</span>
+            <div class="serv"><button class="minus">−</button><span class="n">4</span><button class="plus">+</button></div>
+          </div>
+        </div>
+        <div class="ing"><span class="name">Large eggs</span><span class="qty">6</span></div>
+        <div class="ing"><span class="name">Fresh spinach</span><span class="qty">2 cups</span></div>
+        <div class="ing"><span class="name">Cherry tomatoes</span><span class="qty">1 cup, halved</span></div>
+        <div class="ing"><span class="name">Yellow onion</span><span class="qty">½, diced</span></div>
+        <div class="ing"><span class="name">Garlic</span><span class="qty">2 cloves</span></div>
+        <div class="ing"><span class="name">Cheddar, grated</span><span class="qty">½ cup</span></div>
+        <div class="ing"><span class="name">Olive oil</span><span class="qty">1 tbsp</span></div>
+        <div class="ing"><span class="name">Salt &amp; pepper</span><span class="qty">to taste</span></div>
+      </div>
+
+      <!-- method -->
+      <div class="card">
+        <div class="card-h"><span class="t">Method</span></div>
+        <div class="step"><span class="num">1</span><p>Heat the oven to 190°C (375°F).</p></div>
+        <div class="step"><span class="num">2</span><p>Sauté onion and garlic in olive oil over medium heat until soft, about 4 minutes.</p></div>
+        <div class="step"><span class="num">3</span><p>Add spinach and cook until wilted, ~2 minutes. Stir through the cherry tomatoes.</p></div>
+        <div class="step"><span class="num">4</span><p>Whisk the eggs with salt and pepper; pour over the vegetables in an oven-safe pan.</p></div>
+        <div class="step"><span class="num">5</span><p>Scatter cheddar on top and cook on the stove for 2 minutes until the edges set.</p></div>
+        <div class="step"><span class="num">6</span><p>Bake for 12–15 minutes until golden and just set. Slice and serve warm.</p></div>
+      </div>
+
+      <div class="foot">
+        <svg width="58" height="46" viewBox="0 0 64 54" fill="none" stroke="#3A41D6" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" opacity=".75">
+          <path d="M22 13c0-5 6-4 6-9M32 13c0-5 6-4 6-9M42 13c0-5 6-4 6-9" opacity=".85"/>
+          <path d="M11 22h42l-3.5 25a4.5 4.5 0 0 1-4.5 4H19a4.5 4.5 0 0 1-4.5-4z"/>
+          <path d="M7 23h5M52 23h5"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const timer = document.querySelector('.timer');
+    timer.querySelector('.timer-toggle').addEventListener('click', () => timer.classList.toggle('open'));
+    document.querySelectorAll('.serv').forEach(s => {
+      const n = s.querySelector('.n');
+      s.querySelector('.minus').addEventListener('click', () => { const v = +n.textContent; if (v > 1) n.textContent = v - 1; });
+      s.querySelector('.plus').addEventListener('click',  () => { n.textContent = +n.textContent + 1; });
+    });
+    document.querySelectorAll('.preset').forEach(p => p.addEventListener('click', () => {
+      document.querySelectorAll('.preset').forEach(x => x.classList.remove('on'));
+      p.classList.add('on');
+      document.querySelector('.ring-time .t').textContent = String(p.textContent).padStart(2,'0') + ':00';
+    }));
+  </script>
+</body>
+</html>

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Smart Recipe Planner — Onboarding (design)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --cream:#F0E9DA; --surface:#FFFCF6; --ink:#22203B; --blue:#3A41D6; --blue-deep:#2B309E;
+    --orange:#E5531B; --soft:#E7E8FB; --muted:#8A8475; --border:#ECE4D3; --line:#F0EBE0;
+    --round:'Fredoka',system-ui,sans-serif; --sans:'Hanken Grotesk',system-ui,sans-serif;
+  }
+  * { box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  body { margin:0; padding:40px 20px 64px; background:#15151a; color:#e9e9ee; font-family:var(--sans); }
+  .head { max-width:880px; margin:0 auto 26px; text-align:center; }
+  .head h1 { font-size:21px; font-weight:600; margin:0 0 6px; }
+  .head p { color:#9a9aa4; margin:0; font-size:13.5px; line-height:1.55; }
+  .stage { display:flex; gap:36px; justify-content:center; flex-wrap:wrap; }
+  .col { display:flex; flex-direction:column; align-items:center; gap:12px; }
+  .col .lbl { font-size:12px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:#8a8a94; }
+
+  .phone { position:relative; width:380px; height:800px;
+    background:var(--cream) url("assets/recipe-background.svg") top center / cover no-repeat;
+    border-radius:46px; border:10px solid #0c0c0f; overflow:hidden; box-shadow:0 30px 80px rgba(0,0,0,.55); }
+  .screen { position:absolute; inset:0; overflow-y:auto; }
+  .screen::-webkit-scrollbar { display:none; }
+  .statusbar { display:flex; justify-content:space-between; align-items:center; padding:14px 26px 2px; font-size:13px; font-weight:700; color:var(--ink); }
+  .statusbar svg { width:16px; height:16px; }
+
+  /* ---- sign in ---- */
+  .signin .screen { display:flex; flex-direction:column; }
+  .si-hero { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:0 30px; }
+  .si-hero .berry { margin-bottom:18px; }
+  .si-hero .mark { font-family:var(--round); font-size:46px; font-weight:600; color:var(--blue); margin:0; line-height:1; }
+  .si-hero .tag { font-size:15.5px; color:var(--ink); margin:14px 0 0; font-weight:500; max-width:230px; line-height:1.4; }
+  .si-auth { padding:0 24px 34px; display:flex; flex-direction:column; gap:11px; }
+  .authbtn { display:flex; align-items:center; justify-content:center; gap:10px; padding:15px; border-radius:15px; font-family:var(--sans); font-weight:700; font-size:15px; cursor:pointer; border:none; }
+  .authbtn.google { background:#fff; color:#22203B; border:1px solid var(--border); }
+  .authbtn.apple { background:#111014; color:#fff; }
+  .authbtn svg { width:19px; height:19px; }
+  .legal { text-align:center; font-size:11px; color:var(--muted); margin-top:8px; line-height:1.5; }
+
+  /* ---- quiz ---- */
+  .qz-top { display:flex; align-items:center; justify-content:flex-end; padding:10px 22px 0; }
+  .skip { font-size:13.5px; font-weight:700; color:var(--muted); cursor:pointer; }
+  .qz-hero { padding:8px 24px 4px; }
+  .qz-hero h1 { font-family:var(--round); font-size:30px; font-weight:600; color:var(--blue); margin:0; line-height:1.02; }
+  .qz-hero p { font-size:14px; color:var(--muted); margin:9px 0 0; font-weight:500; line-height:1.45; }
+  .qsec { padding:20px 24px 0; }
+  .qsec .h { font-size:12px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--ink); margin:0 0 4px; }
+  .qsec .sub { font-size:12.5px; color:var(--muted); margin:0 0 13px; font-weight:500; }
+  .qsec .sub b { color:var(--blue-deep); font-weight:700; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .chip { font-size:13.5px; font-weight:600; padding:9px 15px; border-radius:999px; border:1.5px solid var(--border); color:var(--ink); background:var(--surface); cursor:pointer; }
+  .chip.on { background:var(--blue); border-color:var(--blue); color:#fff; }
+  .chip.alg.on { background:var(--blue-deep); border-color:var(--blue-deep); }
+  .qz-cta { padding:26px 24px 30px; }
+  .start { width:100%; padding:16px; border-radius:16px; background:var(--orange); color:#fff; border:none; font-family:var(--sans); font-weight:700; font-size:15.5px; box-shadow:0 6px 16px rgba(229,83,27,.30); cursor:pointer; }
+  .skip-link { display:block; text-align:center; margin-top:14px; font-size:13.5px; font-weight:700; color:var(--muted); cursor:pointer; }
+</style>
+</head>
+<body>
+  <div class="head">
+    <h1>Onboarding — Sign in → Quiz</h1>
+    <p>Auth handed to Google / Apple (no passwords). The quiz is short and skippable — cuisines and diet softly bias recipes; <b>allergies feed the hard safety guard</b>. Chips are tappable.</p>
+  </div>
+
+  <div class="stage">
+
+    <!-- SIGN IN -->
+    <div class="col">
+      <div class="phone signin">
+        <div class="screen">
+          <div class="statusbar"><span>9:41</span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 17h2v3H2zM6 13h2v7H6zM10 9h2v11h-2zM14 5h2v15h-2zM18 9h2v11h-2z"/></svg></div>
+
+          <div class="si-hero">
+            <svg class="berry" width="92" height="92" viewBox="0 0 100 100" fill="none" stroke="#3A41D6" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M50 38c16 0 27 9 27 21 0 16-15 31-27 33C38 90 23 77 23 59c0-12 11-21 27-21z"/>
+              <path d="M50 38c-3-8-9-12-16-11M50 38c3-8 9-12 16-11M50 38V25"/>
+              <path d="M40 54l1 2M52 52l1 2M46 64l1 2M58 60l1 2M37 68l1 2"/>
+            </svg>
+            <p class="mark">Pantry</p>
+            <p class="tag">Cook with what you've already got.</p>
+          </div>
+
+          <div class="si-auth">
+            <button class="authbtn google">
+              <svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.9 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.6-5.2l-6.3-5.2C29.2 35.5 26.7 36 24 36c-5.3 0-9.7-3.1-11.3-7.4l-6.5 5C9.6 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4.1 5.6l6.3 5.2C41.4 36.1 44 30.5 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg>
+              Continue with Google
+            </button>
+            <button class="authbtn apple">
+              <svg viewBox="0 0 24 24" fill="#fff"><path d="M16.4 12.9c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.8-3.5.8-.7 0-1.8-.8-3-.8-1.5 0-2.9.9-3.7 2.3-1.6 2.7-.4 6.8 1.1 9 .7 1.1 1.6 2.3 2.7 2.3 1.1 0 1.5-.7 2.8-.7 1.3 0 1.6.7 2.8.7 1.2 0 1.9-1.1 2.6-2.2.8-1.2 1.2-2.4 1.2-2.5-.1 0-2.3-.9-2.4-3.4zM14.2 6.3c.6-.7 1-1.7.9-2.7-.9 0-1.9.6-2.5 1.3-.5.6-1 1.6-.9 2.6 1 .1 1.9-.5 2.5-1.2z"/></svg>
+              Continue with Apple
+            </button>
+            <p class="legal">By continuing you agree to our Terms &amp; Privacy Policy.</p>
+          </div>
+        </div>
+      </div>
+      <div class="lbl">1 · Sign in</div>
+    </div>
+
+    <!-- QUIZ -->
+    <div class="col">
+      <div class="phone">
+        <div class="screen">
+          <div class="statusbar"><span>9:41</span><svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 17h2v3H2zM6 13h2v7H6zM10 9h2v11h-2zM14 5h2v15h-2zM18 9h2v11h-2z"/></svg></div>
+          <div class="qz-top"><span class="skip">Skip</span></div>
+
+          <div class="qz-hero">
+            <h1>A few quick taps</h1>
+            <p>So your recipes feel like you. Totally optional — skip anytime.</p>
+          </div>
+
+          <div class="qsec">
+            <p class="h">Cuisines you love</p>
+            <p class="sub">We'll lean this way when we can.</p>
+            <div class="chips" data-multi>
+              <span class="chip on">Italian</span><span class="chip on">Mexican</span><span class="chip">Indian</span><span class="chip">Thai</span><span class="chip on">Mediterranean</span><span class="chip">Japanese</span><span class="chip">Middle Eastern</span>
+            </div>
+          </div>
+
+          <div class="qsec">
+            <p class="h">Any diet?</p>
+            <p class="sub">Pick one.</p>
+            <div class="chips" data-single>
+              <span class="chip on">No restriction</span><span class="chip">Vegetarian</span><span class="chip">Vegan</span><span class="chip">Pescatarian</span>
+            </div>
+          </div>
+
+          <div class="qsec">
+            <p class="h">Allergies to keep out</p>
+            <p class="sub"><b>We'll keep these out of every recipe.</b></p>
+            <div class="chips" data-multi>
+              <span class="chip alg">Peanuts</span><span class="chip alg">Tree nuts</span><span class="chip alg">Dairy</span><span class="chip alg">Gluten</span><span class="chip alg">Shellfish</span><span class="chip alg">Eggs</span><span class="chip alg">Soy</span>
+            </div>
+          </div>
+
+          <div class="qz-cta">
+            <button class="start">Start cooking</button>
+            <span class="skip-link">Skip for now</span>
+          </div>
+        </div>
+      </div>
+      <div class="lbl">2 · Quiz (short &amp; skippable)</div>
+    </div>
+
+  </div>
+
+  <script>
+    document.querySelectorAll('.chips').forEach(group => {
+      group.addEventListener('click', e => {
+        const chip = e.target.closest('.chip');
+        if (!chip) return;
+        if (group.hasAttribute('data-single')) {
+          group.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
+          chip.classList.add('on');
+        } else {
+          chip.classList.toggle('on');
+        }
+      });
+    });
+  </script>
+</body>
+</html>
