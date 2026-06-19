@@ -32,6 +32,8 @@ Reference: [product brief](../docs/product/2026-06-18-smart-recipe-planner.md) �
 |---|---|---|
 | `orange` | `#E5531B` | The single primary action per screen (Refresh, camera-roll nub). Never decorative. |
 | `orange-press` | `#C7461480` | Pressed state (≈ darken 12%). |
+| `danger` | `#C0392B` | Destructive only (sign-out). Quiet — never competes with the orange CTA. |
+| `danger-soft` | `#F7E4E1` | Tint behind the sign-out icon. |
 
 ### Semantic roles
 | Role | Token |

@@ -10,6 +10,7 @@ Structural decisions for the Smart Recipe Planner — the choices that are hard 
 | [0002](./decisions/0002-llm-pipeline-and-structured-output.md) | Two-stage LLM pipeline + response-format structured output (Sonnet 4.6) | Accepted | 2026-06-18 |
 | [0003](./decisions/0003-ingredient-and-recipe-schemas.md) | Ingredient and recipe schemas (structured quantities) | Accepted | 2026-06-18 |
 | [0004](./decisions/0004-no-repeat-across-refreshes.md) | No repeats across refreshes (title signature + model-driven variety) | Accepted | 2026-06-18 |
+| [0005](./decisions/0005-backend-topology-expo-supabase.md) | Backend topology — Expo app + Supabase (Auth + Postgres + Edge Function proxy) | Accepted | 2026-06-18 |
 
 ## Core principles
 - **Highly structured, never chat** — every rendered response is typed, schema-validated data.

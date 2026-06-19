@@ -7,6 +7,10 @@ dist/
 web-build/
 *.orig.*
 
+# Supabase CLI local state (link cache — never commit)
+**/.temp/
+mobile/supabase/
+
 # Env / secrets
 .env
 .env.*
