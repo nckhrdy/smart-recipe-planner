@@ -5,7 +5,7 @@ Snap a photo of the ingredients you have on hand and get **5 structured recipes*
 A mobile app built with **Expo** (React Native + TypeScript). **Not a chat interface** — the recipe list and the recipes themselves are highly structured.
 
 **▶ Live demo:** https://smart-recipe-planner-lime.vercel.app
-**▶ Walkthrough video:** _(add unlisted YouTube link)_
+**▶ Walkthrough video:** Please see Ashby submission
 
 > **Using the live demo:** tap **Continue with Google** to sign in, or use **Skip** on the sign-in screen to jump straight in without an account. On the web demo, "snap ingredients" opens your device's photo/camera picker (a browser can't drive the native camera — see [Platform notes](#platform-notes)). For the true native camera experience, run it on a phone via Expo Go (below).
 
