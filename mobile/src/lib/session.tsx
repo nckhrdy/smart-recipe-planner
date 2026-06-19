@@ -6,30 +6,41 @@
  * Onboarding completion is a local flag for v1 (the quiz writes prefs to the
  * `profiles` table separately); it gates the first-launch quiz, not data access.
  *
- * Dev pass-through: when Supabase isn't configured, `isAuthed` is forced true so
- * the shell runs on-device before the backend exists. Real gating engages the
- * moment EXPO_PUBLIC_SUPABASE_* are set.
+ * Dev escape hatch: the sign-in screen offers a "skip" (when Supabase isn't
+ * configured, or EXPO_PUBLIC_DEV_BYPASS_AUTH=true) so the shell runs before
+ * Google OAuth is set up. Unlike a silent bypass, the sign-in step still
+ * renders — skip is an explicit tap that persists like a session until sign-out.
  */
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from 'react';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as QueryParams from 'expo-auth-session/build/QueryParams';
+import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import type { Session } from '@supabase/supabase-js';
 
+import { usePrefs } from '@/lib/prefs';
+import { fetchProfile } from '@/lib/profile';
 import { isSupabaseConfigured, supabase } from '@/lib/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
 
 const ONBOARDED_KEY = 'srp.onboarded.v1';
+const DEV_AUTHED_KEY = 'srp.dev-authed.v1';
 const redirectTo = makeRedirectUri();
 
+// Dev aid: the OAuth redirect the app expects back. Copy this exact value into
+// Supabase → Authentication → URL Configuration → Redirect URLs, or auth falls
+// back to the Site URL (localhost) and the browser can't return to the app.
+if (__DEV__) console.log('[auth] OAuth redirectTo =', redirectTo);
+
 /**
- * Dev-only escape hatch: skip the sign-in wall even when Supabase IS configured.
- * Lets us wire the real DB before Google OAuth is set up. Remove (or set false)
- * once sign-in works. Never enable in a real build.
+ * Dev-only escape hatch: when true (or when Supabase isn't configured), the
+ * sign-in screen offers a "skip" so you can get past the wall before Google
+ * OAuth is set up. The sign-in step still renders — skip is an explicit tap.
+ * Set false in a real build to require real auth.
  */
 const DEV_BYPASS_AUTH = process.env.EXPO_PUBLIC_DEV_BYPASS_AUTH === 'true';
 
@@ -43,7 +54,11 @@ export interface SessionContextValue {
   session: Session | null;
   /** Whether the Supabase backend is wired up (false → dev pass-through). */
   configured: boolean;
+  /** Dev escape hatch is available → the sign-in screen shows a "skip". */
+  canSkipSignIn: boolean;
   signInWithGoogle: () => Promise<void>;
+  /** Dev-only: grant access without real auth. No-op unless canSkipSignIn. */
+  signInAsDev: () => void;
   signOut: () => Promise<void>;
   completeOnboarding: () => Promise<void>;
 }
@@ -52,10 +67,29 @@ const SessionContext = createContext<SessionContextValue | undefined>(undefined)
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
+  const [devAuthed, setDevAuthed] = useState(false);
   const [onboarded, setOnboarded] = useState(false);
   const [initializing, setInitializing] = useState(true);
 
-  const devBypass = !isSupabaseConfigured || DEV_BYPASS_AUTH;
+  const canSkipSignIn = !isSupabaseConfigured || DEV_BYPASS_AUTH;
+
+  /**
+   * Pull the signed-in user's prefs from the `profiles` table into the local
+   * store. An existing row also means they've onboarded before (returning user /
+   * new device), so skip the quiz. New users have no row → quiz runs.
+   */
+  const hydrateFromProfile = useCallback(async (userId: string) => {
+    try {
+      const prefs = await fetchProfile(userId);
+      if (prefs) {
+        usePrefs.getState().setPrefs(prefs);
+        await AsyncStorage.setItem(ONBOARDED_KEY, 'true');
+        setOnboarded(true);
+      }
+    } catch (err) {
+      console.warn('Could not load profile prefs', err);
+    }
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -65,9 +99,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const stored = await AsyncStorage.getItem(ONBOARDED_KEY);
         if (active && stored === 'true') setOnboarded(true);
 
+        const dev = await AsyncStorage.getItem(DEV_AUTHED_KEY);
+        if (active && dev === 'true') setDevAuthed(true);
+
         if (supabase) {
           const { data } = await supabase.auth.getSession();
           if (active) setSession(data.session);
+          if (active && data.session?.user) await hydrateFromProfile(data.session.user.id);
         }
       } finally {
         if (active) setInitializing(false);
@@ -76,15 +114,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
     void bootstrap();
 
-    const listener = supabase?.auth.onAuthStateChange((_event, nextSession) => {
+    const listener = supabase?.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
+      if (event === 'SIGNED_IN' && nextSession?.user) void hydrateFromProfile(nextSession.user.id);
     });
 
     return () => {
       active = false;
       listener?.data.subscription.unsubscribe();
     };
-  }, []);
+  }, [hydrateFromProfile]);
 
   const createSessionFromUrl = useCallback(async (url: string) => {
     if (!supabase) return;
@@ -98,6 +137,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     if (error) throw error;
   }, []);
 
+  // OAuth can return via a deep link (system browser / cold start) rather than the
+  // in-app browser result; parse any inbound URL for tokens as a fallback.
+  useEffect(() => {
+    const sub = Linking.addEventListener('url', ({ url }) => {
+      void createSessionFromUrl(url).catch((err) => console.warn('Deep-link sign-in failed', err));
+    });
+    return () => sub.remove();
+  }, [createSessionFromUrl]);
+
   const signInWithGoogle = useCallback(async () => {
     if (!supabase) {
       Alert.alert(
@@ -107,6 +155,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Web (incl. the Vercel deploy): a normal full-page redirect. The browser
+    // leaves to Google and returns to our origin; the Supabase client parses the
+    // tokens from the URL (detectSessionInUrl) and fires onAuthStateChange.
+    if (Platform.OS === 'web') {
+      const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } });
+      if (error) throw error;
+      return;
+    }
+
+    // Native: open the in-app browser, then parse the returned deep link ourselves.
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo, skipBrowserRedirect: true },
@@ -119,9 +177,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [createSessionFromUrl]);
 
+  const signInAsDev = useCallback(() => {
+    if (!canSkipSignIn) return;
+    setDevAuthed(true);
+    void AsyncStorage.setItem(DEV_AUTHED_KEY, 'true');
+  }, [canSkipSignIn]);
+
   const signOut = useCallback(async () => {
     await supabase?.auth.signOut();
     setSession(null);
+    setDevAuthed(false);
+    await AsyncStorage.removeItem(DEV_AUTHED_KEY);
   }, []);
 
   const completeOnboarding = useCallback(async () => {
@@ -129,8 +195,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setOnboarded(true);
   }, []);
 
-  const isAuthed = devBypass || session !== null;
-  const needsOnboarding = !devBypass && isAuthed && !onboarded;
+  // The sign-in screen renders until you're authed (real Google session or the
+  // dev Skip). On web/Vercel, Google actually works (stable https redirect); the
+  // Skip button (shown when canSkipSignIn) keeps reviewers unblocked. The quiz
+  // then runs once (skippable) to set allergies/cuisines/diet, which drive the
+  // recipe guard with or without auth.
+  const isAuthed = session !== null || devAuthed;
+  const needsOnboarding = isAuthed && !onboarded;
 
   const value: SessionContextValue = {
     initializing,
@@ -138,7 +209,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     needsOnboarding,
     session,
     configured: isSupabaseConfigured,
+    canSkipSignIn,
     signInWithGoogle,
+    signInAsDev,
     signOut,
     completeOnboarding,
   };

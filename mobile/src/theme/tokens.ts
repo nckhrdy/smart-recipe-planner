@@ -24,6 +24,9 @@ export const colors = {
   // Accent — sparingly, one per screen
   orange: '#E5531B', // single primary action (Refresh, camera-roll nub)
   orangePress: '#C74614', // pressed
+  // Destructive — sign-out only (quiet, never competes with the orange CTA)
+  danger: '#C0392B',
+  dangerSoft: '#F7E4E1',
   white: '#FFFFFF',
 } as const;
 

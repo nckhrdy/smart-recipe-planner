@@ -1,9 +1,14 @@
-import { Ionicons } from '@expo/vector-icons';
+/**
+ * IngredientChip — a detected ingredient on the Confirm screen: a cobalt-tint
+ * pill with the name, an optional count stepper (countable items only), and a
+ * remove button. Matches the prototype's `.ichip`.
+ */
+import { Feather } from '@expo/vector-icons';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Stepper } from '@/components/ui/stepper';
 import { AppText } from '@/components/ui/text';
-import { colors, radius, space } from '@/theme/tokens';
+import { colors, fonts, radius, space } from '@/theme/tokens';
 
 export interface IngredientChipProps {
   name: string;
@@ -15,12 +20,12 @@ export interface IngredientChipProps {
 export function IngredientChip({ name, count, onRemove, onCountChange }: IngredientChipProps) {
   return (
     <View style={styles.chip}>
-      <AppText variant="label" numberOfLines={1} style={styles.name}>
+      <AppText style={styles.name} numberOfLines={1}>
         {name}
       </AppText>
       {count !== null && onCountChange ? <Stepper value={count} onChange={onCountChange} compact /> : null}
-      <Pressable onPress={onRemove} hitSlop={8} accessibilityRole="button" accessibilityLabel={`remove ${name}`}>
-        <Ionicons name="close-circle" size={18} color={colors.muted} />
+      <Pressable onPress={onRemove} hitSlop={8} style={styles.remove} accessibilityRole="button" accessibilityLabel={`remove ${name}`}>
+        <Feather name="x" size={12} color={colors.blueDeep} />
       </Pressable>
     </View>
   );
@@ -34,7 +39,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.blueSoft,
     borderRadius: radius.full,
     paddingVertical: space(2),
-    paddingHorizontal: space(3),
+    paddingLeft: space(3) + 1,
+    paddingRight: space(2),
   },
-  name: { color: colors.blueDeep, maxWidth: 160 },
+  name: { fontFamily: fonts.sans.semibold, fontSize: 13.5, color: colors.blueDeep, maxWidth: 170, textTransform: 'capitalize' },
+  remove: { width: 18, height: 18, borderRadius: radius.full, backgroundColor: 'rgba(43,48,158,0.16)', alignItems: 'center', justifyContent: 'center' },
 });

@@ -13,6 +13,7 @@
 import 'react-native-url-polyfill/auto';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -26,7 +27,9 @@ export const supabase: SupabaseClient | null = isSupabaseConfigured
         storage: AsyncStorage,
         autoRefreshToken: true,
         persistSession: true,
-        detectSessionInUrl: false, // React Native has no URL bar; we parse the deep link ourselves
+        // Web: the client reads the OAuth tokens from the returned URL itself.
+        // Native: no URL bar — we parse the deep link ourselves (see session.tsx).
+        detectSessionInUrl: Platform.OS === 'web',
       },
     })
   : null;
