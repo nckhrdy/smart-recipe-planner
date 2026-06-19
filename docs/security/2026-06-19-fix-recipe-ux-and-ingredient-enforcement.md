@@ -1,0 +1,30 @@
+# Security Audit: fix/recipe-ux-and-ingredient-enforcement
+
+**Date:** 2026-06-19
+**Files audited:** 10 (scope: `docs/readme..HEAD` — this branch's commit; `main` is stale so its merge-base diff is the whole app and not the audit target)
+**Verdict:** PASS
+
+## Summary
+No CRITICAL/HIGH/MEDIUM findings. The branch adds a deterministic ingredient-containment gate (pure string ops, no I/O), UI components, and a web label fix — none of which open an attack surface. No dependency changes, no hardcoded secrets, no user-controlled regex, and the one server handler in scope (`recipes/index.ts`) validates input at the boundary. The containment gate actually *narrows* the blast radius of model misbehaviour by rejecting recipes that reach beyond confirmed ingredients.
+
+## Findings
+
+| Severity | OWASP | File:Line | Finding | Remediation |
+|----------|-------|-----------|---------|-------------|
+| LOW | A03/A04 | supabase/functions/recipes/index.ts:36 | User-supplied ingredient names / prefs are interpolated into the LLM prompt (prompt-injection surface). Pre-existing; unchanged by this branch. | Already mitigated: structured-output schema constrains the response shape, and the new `filterByAvailable` + allergy guard discard off-list/unsafe results deterministically. No action required for this PR. |
+
+## Detail / things checked clean
+- **A03 Injection (regex/ReDoS):** The two `new RegExp(...)` calls in `rules.ts` (lines 89, 107) are pre-existing and wrap input in `escapeRegExp`. The new `foodTokens` tokenizer uses a static literal regex (`/[^a-z ]/g`) — no user-controlled pattern, no ReDoS introduced.
+- **A03 XSS:** Recipe text renders through React Native `<AppText>` (and React on web), which escapes by default. No `dangerouslySetInnerHTML`, no raw HTML.
+- **A04 Insecure design / input validation:** `parseRequest` validates at the boundary — array non-empty, each `name` a non-empty string, `strList` filters non-strings, counts coerced to positive ints. The new `availableNames` is derived from this already-validated set. The custom-minutes timer input is validated client-side (digits only, clamped 1–999).
+- **A01 Access control / CORS:** Unchanged; `CORS_HEADERS` and auth wiring not touched.
+- **A02 Crypto / secrets:** No keys, tokens, or credentials in the diff (regex scan clean). `wordmark.png` is image data only.
+- **A06 Vulnerable components:** No `package.json` / lock-file changes — `npm audit` not applicable to this branch.
+- **A09 Logging:** No new logging; no PII/secrets emitted.
+- **A10 SSRF:** No new outbound requests from user-controlled URLs; image picker returns local base64 assets.
+
+## Dependency Audit
+No dependency changes — `package.json` / lock files untouched. `npm audit` not run for this branch.
+
+## CVE References
+None applicable.
