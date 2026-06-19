@@ -1,12 +1,15 @@
 import type { Recipe } from './schema.ts';
 import {
   filterAllergenFree,
+  filterByAvailable,
   findAllergen,
   isAllergenIngredient,
   normalizeTitle,
+  offListIngredients,
   process,
   selectDistinct,
   signature,
+  usesOnlyAvailable,
 } from './rules.ts';
 
 // Minimal recipe factory — only the fields the rules touch matter.
@@ -112,6 +115,53 @@ describe('isAllergenIngredient', () => {
   });
 });
 
+describe('offListIngredients / usesOnlyAvailable', () => {
+  const available = ['egg', 'avocado', 'onion', 'edamame'];
+
+  it('should flag ingredients that are neither on-hand nor a pantry staple (the reported bug)', () => {
+    const r = recipe({
+      title: 'Guacamole Soup',
+      ingredients: [
+        { name: 'avocado', amount: 2, unit: null, note: null },
+        { name: 'onion', amount: 1, unit: null, note: null },
+        { name: 'vegetable broth', amount: 2, unit: 'cups', note: null },
+        { name: 'lime juice', amount: 1, unit: 'tbsp', note: null },
+        { name: 'olive oil', amount: 1, unit: 'tbsp', note: null },
+        { name: 'salt', amount: null, unit: null, note: 'to taste' },
+      ],
+    });
+    expect(offListIngredients(r, available)).toEqual(['vegetable broth', 'lime juice']);
+    expect(usesOnlyAvailable(r, available)).toBe(false);
+  });
+
+  it('should accept on-hand items named with descriptors or plurals, plus staples', () => {
+    const r = recipe({
+      title: 'Crispy Onion Frittata',
+      ingredients: [
+        { name: 'eggs', amount: 4, unit: null, note: null }, // plural of on-hand "egg"
+        { name: 'crispy onions', amount: 1, unit: null, note: null }, // descriptor + plural
+        { name: 'olive oil', amount: 1, unit: 'tbsp', note: null }, // oil staple
+        { name: 'black pepper', amount: null, unit: null, note: 'to taste' }, // pepper staple
+      ],
+    });
+    expect(offListIngredients(r, available)).toEqual([]);
+    expect(usesOnlyAvailable(r, available)).toBe(true);
+  });
+
+  it('should not enforce when there is no pantry context (empty available list)', () => {
+    const batch = [recipe({ title: 'Anything Goes', ingredients: [{ name: 'caviar', amount: 1, unit: null, note: null }] })];
+    expect(filterByAvailable(batch, [])).toHaveLength(1);
+  });
+
+  it('should drop only the recipes that reach off-list from a batch', () => {
+    const batch = [
+      recipe({ title: 'Onion Edamame Toss', ingredients: [{ name: 'onion', amount: 1, unit: null, note: null }, { name: 'edamame', amount: 1, unit: 'cup', note: null }] }),
+      recipe({ title: 'Avocado Lime Bowl', ingredients: [{ name: 'avocado', amount: 1, unit: null, note: null }, { name: 'lime', amount: 1, unit: null, note: null }] }),
+    ];
+    expect(filterByAvailable(batch, available).map((r) => r.title)).toEqual(['Onion Edamame Toss']);
+  });
+});
+
 describe('process (combined pass)', () => {
   it('should apply exclusion AND the allergy guard together', () => {
     const batch = [
@@ -123,5 +173,14 @@ describe('process (combined pass)', () => {
 
     expect(out.map((r) => r.title)).toEqual(['Spinach Frittata']);
     expect(out[0].totalMinutes).toBe(25);
+  });
+
+  it('should also drop recipes that reach beyond the on-hand ingredients', () => {
+    const batch = [
+      recipe({ title: 'Egg Scramble', ingredients: [{ name: 'eggs', amount: 3, unit: null, note: null }] }),
+      recipe({ title: 'Mushroom Risotto', ingredients: [{ name: 'arborio rice', amount: 1, unit: 'cup', note: null }] }),
+    ];
+    const out = process(batch, { available: ['egg', 'onion'] });
+    expect(out.map((r) => r.title)).toEqual(['Egg Scramble']);
   });
 });

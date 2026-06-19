@@ -110,15 +110,77 @@ export function isAllergenIngredient(name: string, allergies: string[]): boolean
   return false;
 }
 
+// ── On-hand containment (the product premise: "cook with what you've got") ───
+// ADR-0002: the model PROPOSES ingredients; here our code DISPOSES of any the
+// user neither has on hand nor can be assumed to keep. Without this gate the
+// model quietly pads recipes with off-list items (broth, citrus, sauces) and the
+// "spotted N ingredients" promise is broken.
+//
+// PANTRY_STAPLES must mirror exactly what the generation prompt permits — they
+// are two halves of one contract, so keep them in sync.
+export const PANTRY_STAPLES = ['salt', 'pepper', 'oil', 'water'] as const;
+
+/** Crude singular form so "tomatoes" matches "tomato" and "eggs" matches "egg". */
+function singularize(word: string): string {
+  if (word.length > 4 && word.endsWith('ies')) return `${word.slice(0, -3)}y`;
+  if (word.length > 3 && word.endsWith('es')) return word.slice(0, -2);
+  if (word.length > 2 && word.endsWith('s')) return word.slice(0, -1);
+  return word;
+}
+
+/** Lowercase food name → singularized word tokens ("Cherry Tomatoes" → [cherry, tomato]). */
+function foodTokens(name: string): string[] {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z ]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length > 0)
+    .map(singularize);
+}
+
+function allowedTokens(available: string[]): Set<string> {
+  const set = new Set<string>();
+  for (const name of [...available, ...PANTRY_STAPLES]) {
+    for (const token of foodTokens(name)) set.add(token);
+  }
+  return set;
+}
+
+/** Recipe ingredient names that are neither on-hand nor a pantry staple. Empty = clean.
+ *  An ingredient line counts as on-hand if it MENTIONS an available item or staple —
+ *  so "crispy onion" matches "onion" and "olive oil" matches the oil staple, while
+ *  "vegetable broth" / "lime juice" match nothing and are flagged. */
+export function offListIngredients(recipe: Recipe, available: string[]): string[] {
+  const allowed = allowedTokens(available);
+  return recipe.ingredients
+    .filter((ing) => {
+      const tokens = foodTokens(ing.name);
+      return tokens.length > 0 && !tokens.some((t) => allowed.has(t));
+    })
+    .map((ing) => ing.name);
+}
+
+export function usesOnlyAvailable(recipe: Recipe, available: string[]): boolean {
+  return offListIngredients(recipe, available).length === 0;
+}
+
+export function filterByAvailable<T extends Recipe>(recipes: T[], available: string[]): T[] {
+  if (available.length === 0) return recipes; // no pantry context → nothing to enforce against
+  return recipes.filter((r) => usesOnlyAvailable(r, available));
+}
+
 // ── Combined deterministic pass ──────────────────────────────────────────────
 export interface ProcessOptions {
   excludeTitles?: string[];
   allergies?: string[];
+  available?: string[]; // confirmed on-hand ingredient names; recipes may use only these + staples
 }
 
-/** Distinct (no exclude/in-batch repeats) AND allergen-free, with server fields added.
- *  Does NOT cap to 5 — the handler decides whether to backfill or trim. */
+/** Distinct (no exclude/in-batch repeats), allergen-free, AND buildable from the
+ *  on-hand ingredients (+ staples), with server fields added. Does NOT cap to 5 —
+ *  the handler decides whether to backfill or trim. */
 export function process(recipes: Recipe[], opts: ProcessOptions = {}): ProcessedRecipe[] {
   const distinct = selectDistinct(recipes, opts.excludeTitles ?? []);
-  return filterAllergenFree(distinct, opts.allergies ?? []);
+  const safe = filterAllergenFree(distinct, opts.allergies ?? []);
+  return filterByAvailable(safe, opts.available ?? []);
 }

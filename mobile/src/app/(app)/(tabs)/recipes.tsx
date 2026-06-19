@@ -10,6 +10,7 @@ import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { RecipeCard } from '@/components/recipe-card';
+import { BrandLoader, GENERATE_MESSAGES, REFRESH_MESSAGES } from '@/components/ui/brand-loader';
 import { StrawberryDoodle } from '@/components/ui/doodles';
 import { Screen } from '@/components/ui/screen';
 import { AppText } from '@/components/ui/text';
@@ -33,19 +34,11 @@ export default function RecipeListScreen() {
   const { initial } = useIdentity();
   const savedIds = useMemo(() => new Set(savedRecipes.map((r) => r.id)), [savedRecipes]);
 
-  // First generate, nothing on screen yet → full loading state.
+  // First generate, nothing on screen yet → full brand loader.
   if (generating && recipes.length === 0) {
     return (
       <Screen>
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.blue} size="large" />
-          <AppText variant="sectionHero" style={styles.centerText}>
-            Cooking up five ideas…
-          </AppText>
-          <AppText variant="meta" style={styles.centerText}>
-            Reading your ingredients and plating options.
-          </AppText>
-        </View>
+        <BrandLoader messages={GENERATE_MESSAGES} />
       </Screen>
     );
   }
@@ -136,22 +129,29 @@ export default function RecipeListScreen() {
         </View>
 
         <View style={styles.cards}>
-          {recipes.map((r, i) => (
-            <RecipeCard
-              key={r.id}
-              recipe={r}
-              index={i}
-              saved={savedIds.has(r.id)}
-              onPress={() => router.push({ pathname: '/recipe/[id]', params: { id: r.id } })}
-              onToggleSave={() => toggle(r)}
-            />
-          ))}
+          {generating ? (
+            // Refresh in flight: clear the old cards, hop the logo in their place.
+            <BrandLoader compact messages={REFRESH_MESSAGES} />
+          ) : (
+            <>
+              {recipes.map((r, i) => (
+                <RecipeCard
+                  key={r.id}
+                  recipe={r}
+                  index={i}
+                  saved={savedIds.has(r.id)}
+                  onPress={() => router.push({ pathname: '/recipe/[id]', params: { id: r.id } })}
+                  onToggleSave={() => toggle(r)}
+                />
+              ))}
 
-          {exhausted ? (
-            <AppText variant="meta" style={styles.exhaust}>
-              You&apos;ve explored these — add an ingredient or start a new photo for more.
-            </AppText>
-          ) : null}
+              {exhausted ? (
+                <AppText variant="meta" style={styles.exhaust}>
+                  You&apos;ve explored these — add an ingredient or start a new photo for more.
+                </AppText>
+              ) : null}
+            </>
+          )}
         </View>
       </ScrollView>
     </Screen>
