@@ -10,7 +10,7 @@
 
 import { callClaudeStructured, ClaudeError, MODELS } from '../_shared/claude.ts';
 import { type ProcessedRecipe, RECIPES_SCHEMA, type RecipesResponse } from '../_shared/schema.ts';
-import { isAllergenIngredient, process as applyRules, TARGET_COUNT } from '../_shared/rules.ts';
+import { isAllergenIngredient, isDietExcludedIngredient, process as applyRules, TARGET_COUNT } from '../_shared/rules.ts';
 import { CORS_HEADERS, errorResponse, json } from '../_shared/cors.ts';
 
 const OVER_GENERATE = 6; // over-generate, then filter to 5 (ADR-0004)
@@ -22,7 +22,7 @@ Hard rules:
 - Use ONLY the provided ingredients plus these assumed pantry staples: salt, pepper, oil, water. Do NOT introduce ANY other ingredient — no broth/stock, no citrus or juice, no dairy, no sauces, no extra spices or produce that isn't in the list. If a dish can't be built within this set, don't return it.
 - Every recipe must be a GENUINELY DIFFERENT dish style — vary dishType (stir-fry, soup, frittata, salad, bake, curry, ...).
 - NEVER include any listed allergen, in any form or derivative.
-- Treat cuisine/diet preferences as a soft bias, not a hard constraint.
+- Cuisine preferences are a soft bias. Dietary restrictions (e.g. vegetarian, vegan) are HARD: never include an excluded ingredient or a dish built around one.
 Format: integer minutes; numbered logical steps; amount is null for "to taste" items; write amounts for the given base servings.`;
 
 interface RecipeRequest {
@@ -40,7 +40,17 @@ function buildPrompt(input: RecipeRequest, excludeTitles: string[], excludeDishT
   );
   lines.push(`Cooking for ${input.servings} ${input.servings === 1 ? 'person' : 'people'}.`);
   if (input.prefs.cuisines?.length) lines.push(`Preferred cuisines (soft): ${input.prefs.cuisines.join(', ')}.`);
-  if (input.prefs.diets?.length) lines.push(`Dietary preferences (soft): ${input.prefs.diets.join(', ')}.`);
+  if (input.prefs.diets?.length) {
+    const strict = input.prefs.diets.filter((d) => /vegetarian|vegan/i.test(d));
+    const soft = input.prefs.diets.filter((d) => !/vegetarian|vegan/i.test(d));
+    if (strict.length) {
+      const vegan = strict.some((d) => /vegan/i.test(d));
+      lines.push(
+        `STRICT diet — every recipe must be ${strict.join(' and ').toLowerCase()}: no meat, poultry, or seafood${vegan ? ', and no dairy, eggs, or honey' : ''}.`,
+      );
+    }
+    if (soft.length) lines.push(`Other dietary preferences (soft): ${soft.join(', ')}.`);
+  }
   if (input.allergies.length) {
     lines.push(`STRICT — exclude these allergens and anything derived from them: ${input.allergies.join(', ')}.`);
   }
@@ -89,8 +99,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (typeof parsed === 'string') return errorResponse(parsed);
 
   // Never offer the model an ingredient the user is allergic to — otherwise it
-  // builds recipes around it and the guard rejects all of them.
-  parsed.ingredients = parsed.ingredients.filter((i) => !isAllergenIngredient(i.name, parsed.allergies));
+  // builds recipes around it and the guard rejects all of them. Same reasoning for
+  // a hard diet: a vegetarian's chicken (or a vegan's milk) is dropped from input.
+  const diets = parsed.prefs.diets ?? [];
+  parsed.ingredients = parsed.ingredients.filter(
+    (i) => !isAllergenIngredient(i.name, parsed.allergies) && !isDietExcludedIngredient(i.name, diets),
+  );
   if (parsed.ingredients.length === 0) return json({ recipes: [], exhausted: true });
 
   const kept: (ProcessedRecipe & { id: string })[] = [];
@@ -112,11 +126,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
       });
 
       // Deterministic guarantees: distinct (vs exclude + this session's keepers),
-      // allergy-safe, AND buildable from on-hand ingredients + staples (the model
-      // ignores the prompt's allowlist often enough that this gate is load-bearing).
+      // allergy-safe, diet-compliant (vegetarian/vegan), AND buildable from on-hand
+      // ingredients + staples (the model ignores these often enough that the gate
+      // is load-bearing, not belt-and-suspenders).
       const processed = applyRules(result.recipes ?? [], {
         excludeTitles,
         allergies: parsed.allergies,
+        diets,
         available: availableNames,
       });
       for (const recipe of processed) {
