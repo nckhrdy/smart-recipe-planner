@@ -1,0 +1,3 @@
+# Node test tooling (the functions themselves run on Deno, no node_modules)
+node_modules/
+.deno/
