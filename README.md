@@ -64,6 +64,7 @@ npm install
 npx expo start -c          # scan the QR with Expo Go (App Store version = SDK 54)
 ```
 The sign-in screen's **Skip** opens the app immediately; set allergies/prefs in the Profile tab.
+(Requires .env vars. Please reach out for access to them)
 
 ### On web, locally
 ```bash
@@ -73,6 +74,7 @@ npx expo start --web                 # dev server
 # or a production build:
 npx expo export --platform web       # outputs ./dist (what Vercel serves)
 ```
+(Requires .env vars. Please reach out for access to them)
 
 ### Point it at your own Supabase (optional)
 1. Create a Supabase project.
