@@ -19,7 +19,7 @@ const RECENT_TITLES_HINT = 15;
 
 const SYSTEM = `You generate distinct, realistic home recipes from a confirmed list of on-hand ingredients.
 Hard rules:
-- Use mainly the provided ingredients; you may assume basic staples (salt, pepper, oil, water).
+- Use ONLY the provided ingredients plus these assumed pantry staples: salt, pepper, oil, water. Do NOT introduce ANY other ingredient — no broth/stock, no citrus or juice, no dairy, no sauces, no extra spices or produce that isn't in the list. If a dish can't be built within this set, don't return it.
 - Every recipe must be a GENUINELY DIFFERENT dish style — vary dishType (stir-fry, soup, frittata, salad, bake, curry, ...).
 - NEVER include any listed allergen, in any form or derivative.
 - Treat cuisine/diet preferences as a soft bias, not a hard constraint.
@@ -95,6 +95,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   const kept: (ProcessedRecipe & { id: string })[] = [];
   const keptTitles: string[] = [];
+  const availableNames = parsed.ingredients.map((i) => i.name);
 
   try {
     for (let round = 0; round < MAX_ROUNDS && kept.length < TARGET_COUNT; round++) {
@@ -110,8 +111,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
         maxTokens: 6000,
       });
 
-      // Deterministic guarantees: distinct (vs exclude + this session's keepers) and allergy-safe.
-      const processed = applyRules(result.recipes ?? [], { excludeTitles, allergies: parsed.allergies });
+      // Deterministic guarantees: distinct (vs exclude + this session's keepers),
+      // allergy-safe, AND buildable from on-hand ingredients + staples (the model
+      // ignores the prompt's allowlist often enough that this gate is load-bearing).
+      const processed = applyRules(result.recipes ?? [], {
+        excludeTitles,
+        allergies: parsed.allergies,
+        available: availableNames,
+      });
       for (const recipe of processed) {
         if (kept.length >= TARGET_COUNT) break;
         kept.push({ ...recipe, id: crypto.randomUUID() });
