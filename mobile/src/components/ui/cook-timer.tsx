@@ -1,20 +1,23 @@
 /**
  * CookTimer — a generic, user-set countdown (screens.md: no per-step timers in
  * v1). Collapsed to a tappable button by default; tap to reveal the ring,
- * presets, and Start. The ring is the one place orange earns its keep on this
- * screen, matching the recipe-detail prototype.
+ * presets, a custom-minutes field, and Start. The ring is the one place orange
+ * earns its keep on this screen, matching the recipe-detail prototype.
  */
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
 import { AppText } from '@/components/ui/text';
 import { colors, fonts, radius, shadow, space } from '@/theme/tokens';
 
 const PRESETS = [5, 10, 20, 30] as const; // minutes
+const MAX_MINUTES = 999; // hard cap — keeps the ring readable and input sane
 const RADIUS = 44;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+
+const isPreset = (minutes: number): boolean => (PRESETS as readonly number[]).includes(minutes);
 
 function format(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -27,7 +30,10 @@ export function CookTimer({ defaultMinutes = 20 }: { defaultMinutes?: number }) 
   const [total, setTotal] = useState(defaultMinutes * 60);
   const [remaining, setRemaining] = useState(defaultMinutes * 60);
   const [running, setRunning] = useState(false);
+  // Seed the custom field when the recipe's default isn't one of the presets.
+  const [customText, setCustomText] = useState(() => (isPreset(defaultMinutes) ? '' : String(defaultMinutes)));
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const customRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (!running) return;
@@ -45,10 +51,23 @@ export function CookTimer({ defaultMinutes = 20 }: { defaultMinutes?: number }) 
     };
   }, [running]);
 
-  const selectPreset = (minutes: number) => {
+  const applyMinutes = (minutes: number) => {
     setRunning(false);
     setTotal(minutes * 60);
     setRemaining(minutes * 60);
+  };
+
+  const selectPreset = (minutes: number) => {
+    setCustomText('');
+    applyMinutes(minutes);
+  };
+
+  // Validate at the boundary: keep digits only, clamp to 1..MAX_MINUTES.
+  const onChangeCustom = (text: string) => {
+    const digits = text.replace(/[^0-9]/g, '').slice(0, 3);
+    setCustomText(digits);
+    const minutes = Number(digits);
+    if (minutes >= 1 && minutes <= MAX_MINUTES) applyMinutes(minutes);
   };
 
   const toggleRun = () => {
@@ -62,6 +81,7 @@ export function CookTimer({ defaultMinutes = 20 }: { defaultMinutes?: number }) 
 
   const progress = total > 0 ? remaining / total : 0;
   const selectedMinutes = total / 60;
+  const customActive = !isPreset(selectedMinutes);
   const startLabel = running ? 'Pause' : remaining === 0 ? 'Restart' : remaining < total ? 'Resume' : 'Start timer';
 
   return (
@@ -112,6 +132,26 @@ export function CookTimer({ defaultMinutes = 20 }: { defaultMinutes?: number }) 
                 </Pressable>
               );
             })}
+            <Pressable
+              onPress={() => customRef.current?.focus()}
+              style={[styles.preset, styles.customPreset, customActive && styles.presetOn]}
+              accessibilityRole="button"
+              accessibilityLabel="Set a custom time in minutes"
+            >
+              <Feather name="edit-2" size={11} color={customActive ? colors.white : colors.muted} />
+              <TextInput
+                ref={customRef}
+                value={customText}
+                onChangeText={onChangeCustom}
+                placeholder="Min"
+                placeholderTextColor={customActive ? 'rgba(255,255,255,0.85)' : colors.muted}
+                keyboardType="number-pad"
+                maxLength={3}
+                returnKeyType="done"
+                accessibilityLabel="Custom minutes"
+                style={[styles.presetText, styles.customInput, customActive && styles.presetTextOn]}
+              />
+            </Pressable>
           </View>
 
           <Pressable onPress={toggleRun} style={({ pressed }) => [styles.start, pressed && styles.startPressed]} accessibilityRole="button">
@@ -135,14 +175,16 @@ const styles = StyleSheet.create({
   body: { borderTopWidth: 1, borderTopColor: colors.line, paddingHorizontal: space(4), paddingBottom: space(4) },
   ringWrap: { width: 120, height: 120, alignSelf: 'center', marginTop: space(4), marginBottom: space(1) },
   ringCenter: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
-  ringTime: { fontFamily: fonts.sans.extrabold, fontSize: 26, color: colors.blue, letterSpacing: -0.5 },
+  ringTime: { fontFamily: fonts.sans.extrabold, fontSize: 26, lineHeight: 34, color: colors.blue, letterSpacing: -0.5, includeFontPadding: false },
   ringUnit: { fontFamily: fonts.sans.semibold, fontSize: 9, letterSpacing: 1.3, textTransform: 'uppercase', color: colors.muted, marginTop: 1 },
 
-  presets: { flexDirection: 'row', gap: space(2), justifyContent: 'center', marginTop: space(3) },
+  presets: { flexDirection: 'row', flexWrap: 'wrap', gap: space(2), justifyContent: 'center', marginTop: space(3) },
   preset: { borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.full, paddingHorizontal: space(3), paddingVertical: space(2), minWidth: 44, alignItems: 'center' },
   presetOn: { backgroundColor: colors.blue, borderColor: colors.blue },
   presetText: { fontFamily: fonts.sans.bold, fontSize: 13, color: colors.ink },
   presetTextOn: { color: colors.white },
+  customPreset: { flexDirection: 'row', alignItems: 'center', gap: space(1) },
+  customInput: { minWidth: 30, padding: 0, textAlign: 'center', includeFontPadding: false },
 
   start: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space(2), marginTop: space(3), paddingVertical: space(3), borderRadius: radius.md, backgroundColor: colors.orange, ...shadow.cta },
   startPressed: { backgroundColor: colors.orangePress },

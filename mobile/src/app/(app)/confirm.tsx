@@ -10,6 +10,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { IngredientChip } from '@/components/ingredient-chip';
+import { BrandLoader, GENERATE_MESSAGES } from '@/components/ui/brand-loader';
 import { IconButton } from '@/components/ui/icon-button';
 import { Screen } from '@/components/ui/screen';
 import { Stepper } from '@/components/ui/stepper';
@@ -68,6 +69,16 @@ export default function ConfirmScreen() {
     const have = new Set(draft.map((d) => d.name));
     return COMMON_INGREDIENTS.filter((name) => !have.has(name));
   }, [draft]);
+
+  // Generation runs from here (we navigate to /recipes on success) — take over the
+  // screen with the brand loader rather than just spinning the footer button.
+  if (generating) {
+    return (
+      <Screen>
+        <BrandLoader messages={GENERATE_MESSAGES} />
+      </Screen>
+    );
+  }
 
   return (
     <Screen padded={false}>
@@ -194,19 +205,39 @@ function AddPicker({
   onClose: () => void;
 }) {
   const [query, setQuery] = useState('');
+  const [lastAdded, setLastAdded] = useState<string | null>(null);
   const q = query.trim().toLowerCase();
   const filtered = q ? options.filter((o) => o.includes(q)) : options;
-  // Offer a free-text add when the typed value isn't already a list option or in the draft.
-  const canAddCustom = q.length > 0 && !existing.includes(q) && !options.includes(q);
+  // The draft (detected + custom) isn't in `options`, so check it separately —
+  // otherwise re-typing an already-added item wrongly reads as "no matches".
+  const alreadyAdded = q.length > 0 && existing.includes(q);
+  // Offer a free-text add only when it isn't already a list option or in the draft.
+  const canAddCustom = q.length > 0 && !alreadyAdded && !options.includes(q);
 
+  // Pick a curated list item: confirm it, but keep the query so several matches
+  // from one search can be added in a row (the chip leaves the list on its own).
+  const pickFromList = (name: string) => {
+    onPick(name);
+    setLastAdded(name);
+  };
+
+  // Add a free-typed item: confirm it, then clear so the "Add …" chip doesn't linger.
   const addCustom = () => {
     if (!q) return;
-    onPick(query.trim());
+    const name = query.trim();
+    onPick(name);
+    setLastAdded(name);
     setQuery('');
+  };
+
+  const onType = (text: string) => {
+    setQuery(text);
+    if (lastAdded) setLastAdded(null);
   };
 
   const close = () => {
     setQuery('');
+    setLastAdded(null);
     onClose();
   };
 
@@ -227,7 +258,7 @@ function AddPicker({
             <Feather name="search" size={18} color={colors.muted} />
             <TextInput
               value={query}
-              onChangeText={setQuery}
+              onChangeText={onType}
               placeholder="Search the list or type your own"
               placeholderTextColor={colors.muted}
               style={styles.searchInput}
@@ -238,6 +269,15 @@ function AddPicker({
             />
           </View>
 
+          {lastAdded && q === '' ? (
+            <View style={styles.addedNote}>
+              <Feather name="check-circle" size={15} color={colors.blue} />
+              <AppText style={styles.addedNoteText}>
+                Added “{lastAdded}” — search to add another.
+              </AppText>
+            </View>
+          ) : null}
+
           <ScrollView contentContainerStyle={styles.sheetChips} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             {canAddCustom ? (
               <Pressable onPress={addCustom} style={[styles.pickChip, styles.pickChipCustom]} accessibilityRole="button">
@@ -246,14 +286,18 @@ function AddPicker({
               </Pressable>
             ) : null}
             {filtered.map((name) => (
-              <Pressable key={name} onPress={() => onPick(name)} style={styles.pickChip} accessibilityRole="button">
+              <Pressable key={name} onPress={() => pickFromList(name)} style={styles.pickChip} accessibilityRole="button">
                 <Feather name="plus" size={13} color={colors.blueDeep} />
                 <AppText style={styles.pickChipText}>{name}</AppText>
               </Pressable>
             ))}
             {filtered.length === 0 && !canAddCustom ? (
               <AppText variant="meta">
-                {options.length === 0 ? 'You’ve added everything on the list.' : 'No matches — keep typing to add your own.'}
+                {alreadyAdded
+                  ? `“${query.trim()}” is already in your list.`
+                  : options.length === 0
+                    ? 'You’ve added everything on the list.'
+                    : 'No matches — keep typing to add your own.'}
               </AppText>
             ) : null}
           </ScrollView>
@@ -303,6 +347,8 @@ const styles = StyleSheet.create({
   done: { fontFamily: fonts.sans.bold, fontSize: 15, color: colors.blue },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: space(2), backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: space(3) + 1, paddingVertical: space(3), marginTop: space(3), marginBottom: space(3) },
   searchInput: { flex: 1, fontFamily: fonts.sans.medium, fontSize: 15, color: colors.ink, padding: 0 },
+  addedNote: { flexDirection: 'row', alignItems: 'center', gap: space(2), backgroundColor: colors.blueSoft, borderRadius: radius.md, paddingVertical: space(2) + 1, paddingHorizontal: space(3), marginBottom: space(3) },
+  addedNoteText: { flex: 1, fontFamily: fonts.sans.semibold, fontSize: 13, color: colors.blueDeep },
   sheetChips: { flexDirection: 'row', flexWrap: 'wrap', gap: space(2), paddingBottom: space(4) },
   pickChip: { flexDirection: 'row', alignItems: 'center', gap: space(1) + 1, backgroundColor: colors.blueSoft, borderRadius: radius.full, paddingVertical: space(2) + 1, paddingHorizontal: space(3) + 1 },
   pickChipText: { fontFamily: fonts.sans.semibold, fontSize: 13.5, color: colors.blueDeep, textTransform: 'capitalize' },

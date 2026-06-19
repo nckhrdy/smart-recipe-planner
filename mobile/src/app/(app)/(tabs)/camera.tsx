@@ -9,6 +9,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { BrandLoader, SCAN_MESSAGES } from '@/components/ui/brand-loader';
 import { Button } from '@/components/ui/button';
 import { Screen } from '@/components/ui/screen';
 import { AppText } from '@/components/ui/text';
@@ -53,6 +54,20 @@ export default function CameraScreen() {
   const working = busy || detecting;
   const hasPhotos = staged.length > 0;
   const full = staged.length >= MAX_PHOTOS;
+  // On web the camera button is hidden and this opens the browser file picker, so
+  // "Library" is meaningless — use upload wording. On native it sits beside "Take
+  // a photo" and correctly means the photo library.
+  const libraryLabel =
+    Platform.OS === 'web' ? (hasPhotos ? 'Add another photo' : 'Upload a photo') : 'Library';
+
+  // Full-screen brand loader while the first scan reads the staged photos.
+  if (detecting) {
+    return (
+      <Screen>
+        <BrandLoader messages={SCAN_MESSAGES} />
+      </Screen>
+    );
+  }
 
   return (
     <Screen>
@@ -102,7 +117,7 @@ export default function CameraScreen() {
               />
             ) : null}
             <Button
-              label="Library"
+              label={libraryLabel}
               variant={hasPhotos ? 'ghost' : 'primary'}
               onPress={() => void add('library')}
               disabled={working || full}
