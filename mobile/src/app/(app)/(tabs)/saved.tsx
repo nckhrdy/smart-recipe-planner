@@ -12,6 +12,7 @@ import { RecipeCard } from '@/components/recipe-card';
 import { BookmarkDoodle } from '@/components/ui/doodles';
 import { Screen } from '@/components/ui/screen';
 import { AppText } from '@/components/ui/text';
+import { isVegetarian } from '@/lib/diet';
 import { useSaved } from '@/lib/saved';
 import { colors, fonts, radius, shadow, space } from '@/theme/tokens';
 
@@ -28,7 +29,7 @@ export default function SavedScreen() {
     const q = query.trim().toLowerCase();
     return saved.filter((r) => {
       if (q && !r.title.toLowerCase().includes(q) && !r.ingredients.some((i) => i.name.includes(q))) return false;
-      if (filter === 'Vegetarian') return r.tags.some((t) => /vegetarian|vegan/i.test(t));
+      if (filter === 'Vegetarian') return isVegetarian(r);
       if (filter === 'Under 30 min') return r.totalMinutes <= 30;
       if (filter === 'Breakfast') return /breakfast/i.test(r.dishType) || r.tags.some((t) => /breakfast/i.test(t));
       return true;

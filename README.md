@@ -87,7 +87,7 @@ npx expo export --platform web       # outputs ./dist (what Vercel serves)
 ## Test it
 
 ```bash
-# Server rule/unit tests (allergy guard, no-repeat signatures) — 14 Jest tests
+# Server rule/unit tests (allergy + diet guards, on-hand containment, no-repeat signatures) — 31 Jest tests
 cd supabase && npm test
 
 # App: type-check + lint
@@ -103,11 +103,22 @@ Manual QA checklist: [`docs/testing/manual-qa.md`](docs/testing/manual-qa.md).
 - **Camera:** native (Expo Go / a build) uses the device camera; on **web**, browsers can't open the native camera, so capture falls back to the photo/file picker (which offers "Take Photo" on mobile browsers).
 - **Auth:** Google OAuth works on the deployed web URL (stable https redirect). In Expo Go the OAuth redirect is bound to the dev machine's IP, so the **Skip** shortcut is the way in there. Sign-in/quiz/profile-sync are bonus scope on top of the required flow; the core experience needs no account.
 
-## Known limitations / next steps
+## Known limitations & edge cases
 
-- **Rate limiting** on the AI Edge Functions (a public deploy exposes the URL + anon key — RLS protects data, but the AI proxy could be abused; add per-IP/user limits before a real launch).
-- **No mobile-side test suite** yet (server rules are tested); pure logic like servings-scaling is the first thing to cover.
-- **Session is client-authoritative** — a full reload resets the current recipe list (saved recipes persist). A documented v1 trade-off (ADR-0004).
+What's intentionally v1, and what a production build would harden. The rule layer is deliberately a **deterministic word heuristic** (`supabase/functions/_shared/rules.ts`) — fast, testable, and honest about its gaps — with a learned/embedding approach as the documented v2 lever.
+
+### Edge cases in the rules layer
+- **Allergen matching is prefix-based, so it can over-match.** An *egg* allergy matches `eggplant` (and would drop it from your ingredients); the prefix is deliberate so plurals like "peanuts" are caught. Fixing it means a small exception list, not a regex change. v2: an allergen→ingredient map / embeddings.
+- **On-hand containment is word-matching, not semantic.** A recipe ingredient counts as "on hand" if it mentions an item you have or a pantry staple, with a denylist so a *processed product* isn't mistaken for the raw item (`tomato sauce` ≠ `tomato`). It can still err both ways — e.g. `lemon juice` is flagged off-list even if you have a lemon. v2: an embedding / ingredient-graph match.
+- **Setting an allergy can shrink the recipe set.** Removing a keystone ingredient (eggs) from a small pantry leaves fewer buildable dishes, so you may see fewer than 5 recipes and the honest "you've explored these" state rather than padded ones (ADR-0004). Mitigation today: photograph a fuller pantry.
+- **No-repeat is exact-concept de-dup.** Synonym-reworded dishes ("garlic butter pasta" vs "buttery garlic pasta") can still slip through within a session. v2: embedding-based near-duplicate clustering (ADR-0004).
+
+### Production hardening (next steps)
+- **Rate limiting on the AI Edge Functions.** A public deploy exposes the function URL + anon key — RLS protects *data*, but the AI proxy itself could be abused. Add per-IP / per-user limits and a cost ceiling before a real launch. **(Top priority.)**
+- **No mobile-side test suite yet.** The server rule layer is covered by Jest; pure client logic like servings-scaling is the first thing to add.
+- **Session is client-authoritative.** A full reload resets the current recipe list (saved recipes persist) — a deliberate trade-off to keep the backend stateless and desync-proof (ADR-0004). A server-side session store is the v2 path.
+- **Apple Sign-In is deferred** (needs a paid Apple Developer account); the auth design is provider-agnostic, so it's a config add, not a rewrite (ADR-0005).
+- **User photos aren't persisted.** Vision runs on the image, then it's discarded — no server-side storage of user photos in v1.
 
 ## More docs
 

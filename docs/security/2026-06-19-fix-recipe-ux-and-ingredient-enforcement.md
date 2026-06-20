@@ -28,3 +28,25 @@ No dependency changes — `package.json` / lock files untouched. `npm audit` not
 
 ## CVE References
 None applicable.
+
+---
+
+## Follow-up audit — diet guard + containment fix + docs (2026-06-19)
+
+**Files audited:** 8 (the 2 unpushed commits `a3cdc4a`, `6b6294e`). **Verdict:** PASS — no CRITICAL/HIGH/MEDIUM.
+
+Covers the later delta: the `DERIVED_PRODUCT_TERMS` containment fix, the diet guard (`findDietConflict`/`filterByDiet`/`isDietExcludedIngredient`) + `mobile/src/lib/diet.ts` + `saved.tsx`, and the committed docs (README, `architecture.html`, review report).
+
+### Findings
+No new findings. The pre-existing prompt-injection **LOW** (recipes/index.ts) still stands and is unchanged.
+
+### Things checked clean
+- **A03 Injection / ReDoS:** The diet guard and containment fix use static `Set` membership and the static tokenizer regex `/[^a-z ]/g` — **no user-controlled `RegExp`** added. `diet.ts` is the same per-word matching with literal patterns. No new dynamic regex anywhere in the diff.
+- **A03 XSS:** `diet.ts` / `saved.tsx` render through React Native `<AppText>` (auto-escaped); no `dangerouslySetInnerHTML`. `architecture.html` is a standalone **documentation** file, not served by the app or bundled into it — it can't reach app users.
+- **A02 Crypto / secrets:** Regex secret scan over the full diff and a targeted scan of `README.md` + `architecture.html` for `sk-ant-`/`sb_secret_`/`service_role`/JWT patterns — **clean**. `architecture.html` only references public Google Fonts (preconnect/stylesheet); no inline credentials, no data-exfil script.
+- **A04 Input validation:** `recipes/index.ts` diet wiring consumes `prefs.diets` already filtered by `strList` in `parseRequest`; `availableNames` still derives from the validated, allergen/diet-stripped set. Boundary validation intact.
+- **A06 Vulnerable components:** No `package.json` / lock-file changes — `npm audit` not applicable.
+- **A09 / A10:** No new logging of PII/secrets; no new outbound requests from user-controlled URLs.
+
+### Note (carryover, not introduced here)
+Rate limiting on the AI Edge Functions remains the top pre-production item (A04, MEDIUM in spirit) — it is **pre-existing**, not part of this diff, and is now documented as top priority in the README's "Known limitations & edge cases" section. Not a blocker for this push.

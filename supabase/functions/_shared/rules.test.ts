@@ -2,8 +2,11 @@ import type { Recipe } from './schema.ts';
 import {
   filterAllergenFree,
   filterByAvailable,
+  filterByDiet,
   findAllergen,
+  findDietConflict,
   isAllergenIngredient,
+  isDietExcludedIngredient,
   normalizeTitle,
   offListIngredients,
   process,
@@ -115,6 +118,69 @@ describe('isAllergenIngredient', () => {
   });
 });
 
+describe('findDietConflict / filterByDiet', () => {
+  it('should flag meat for a vegetarian (happy path)', () => {
+    const r = recipe({ title: 'Chicken Skillet', ingredients: [{ name: 'chicken breast', amount: 1, unit: null, note: null }] });
+    expect(findDietConflict(r, ['Vegetarian'])).toBe('Vegetarian');
+  });
+
+  it('should flag seafood for a vegetarian too', () => {
+    const r = recipe({ title: 'Tuna Melt', ingredients: [{ name: 'canned tuna', amount: 1, unit: 'can', note: null }] });
+    expect(findDietConflict(r, ['Vegetarian'])).toBe('Vegetarian');
+  });
+
+  it('should NOT flag meat-free dishes named like near-misses (scalloped / chickpea)', () => {
+    const r = recipe({
+      title: 'Scalloped Potatoes',
+      ingredients: [{ name: 'potatoes', amount: 4, unit: null, note: null }, { name: 'chickpeas', amount: 1, unit: 'cup', note: null }],
+    });
+    expect(findDietConflict(r, ['Vegetarian'])).toBeNull();
+  });
+
+  it('should allow dairy/egg for vegetarian but block them for vegan', () => {
+    const r = recipe({
+      title: 'Cheese Omelette',
+      ingredients: [{ name: 'cheddar', amount: 1, unit: 'cup', note: null }, { name: 'eggs', amount: 2, unit: null, note: null }],
+    });
+    expect(findDietConflict(r, ['Vegetarian'])).toBeNull();
+    expect(findDietConflict(r, ['Vegan'])).toBe('Vegan');
+  });
+
+  it('should not mistake plant analogs for dairy on a vegan diet (edge case)', () => {
+    const r = recipe({
+      title: 'Berry Smoothie',
+      ingredients: [{ name: 'almond milk', amount: 1, unit: 'cup', note: null }, { name: 'peanut butter', amount: 1, unit: 'tbsp', note: null }],
+    });
+    expect(findDietConflict(r, ['Vegan'])).toBeNull();
+  });
+
+  it('should enforce nothing for diets it cannot judge by name (keto)', () => {
+    const r = recipe({ title: 'Bacon Bowl', ingredients: [{ name: 'bacon', amount: 3, unit: 'strips', note: null }] });
+    expect(findDietConflict(r, ['Keto'])).toBeNull();
+  });
+
+  it('should drop only the diet-violating recipes from a batch', () => {
+    const batch = [
+      recipe({ title: 'Beef Tacos', ingredients: [{ name: 'ground beef', amount: 200, unit: 'g', note: null }] }),
+      recipe({ title: 'Bean Tacos', ingredients: [{ name: 'black beans', amount: 1, unit: 'cup', note: null }] }),
+    ];
+    expect(filterByDiet(batch, ['Vegetarian']).map((r) => r.title)).toEqual(['Bean Tacos']);
+  });
+});
+
+describe('isDietExcludedIngredient', () => {
+  it('should flag meat/seafood for vegetarian, dairy for vegan only (happy path)', () => {
+    expect(isDietExcludedIngredient('chicken thigh', ['Vegetarian'])).toBe(true);
+    expect(isDietExcludedIngredient('milk', ['Vegetarian'])).toBe(false);
+    expect(isDietExcludedIngredient('milk', ['Vegan'])).toBe(true);
+  });
+
+  it('should keep plant ingredients and analogs (edge case)', () => {
+    expect(isDietExcludedIngredient('chickpeas', ['Vegetarian'])).toBe(false);
+    expect(isDietExcludedIngredient('oat milk', ['Vegan'])).toBe(false);
+  });
+});
+
 describe('offListIngredients / usesOnlyAvailable', () => {
   const available = ['egg', 'avocado', 'onion', 'edamame'];
 
@@ -148,6 +214,34 @@ describe('offListIngredients / usesOnlyAvailable', () => {
     expect(usesOnlyAvailable(r, available)).toBe(true);
   });
 
+  it('should flag a processed product even when a flavour word is on-hand (the egg-allergy leak)', () => {
+    const r = recipe({
+      title: 'Smothered Onions',
+      ingredients: [
+        { name: 'onion', amount: 2, unit: null, note: null }, // genuinely on hand
+        { name: 'onion powder', amount: 1, unit: 'tsp', note: null }, // a spice — NOT on hand
+        { name: 'tomato sauce', amount: 1, unit: 'cup', note: null }, // a product — NOT on hand
+        { name: 'vegetable broth', amount: 1, unit: 'cup', note: null }, // off-list outright
+      ],
+    });
+    // Before the fix, "onion powder" and "tomato sauce" slipped through on a single
+    // shared word and the recipe read as "uses only what you have".
+    expect(offListIngredients(r, available)).toEqual(['onion powder', 'tomato sauce', 'vegetable broth']);
+    expect(usesOnlyAvailable(r, available)).toBe(false);
+  });
+
+  it('should still accept a processed product the user genuinely has on hand', () => {
+    const r = recipe({
+      title: 'Edamame Stir-fry',
+      ingredients: [
+        { name: 'edamame', amount: 1, unit: 'cup', note: null },
+        { name: 'soy sauce', amount: 2, unit: 'tbsp', note: null }, // on hand below
+      ],
+    });
+    expect(offListIngredients(r, [...available, 'soy sauce'])).toEqual([]);
+    expect(usesOnlyAvailable(r, [...available, 'soy sauce'])).toBe(true);
+  });
+
   it('should not enforce when there is no pantry context (empty available list)', () => {
     const batch = [recipe({ title: 'Anything Goes', ingredients: [{ name: 'caviar', amount: 1, unit: null, note: null }] })];
     expect(filterByAvailable(batch, [])).toHaveLength(1);
@@ -173,6 +267,15 @@ describe('process (combined pass)', () => {
 
     expect(out.map((r) => r.title)).toEqual(['Spinach Frittata']);
     expect(out[0].totalMinutes).toBe(25);
+  });
+
+  it('should also drop diet-violating recipes', () => {
+    const batch = [
+      recipe({ title: 'Pork Ramen', ingredients: [{ name: 'pork belly', amount: 1, unit: null, note: null }] }),
+      recipe({ title: 'Veggie Ramen', ingredients: [{ name: 'tomato', amount: 2, unit: null, note: null }] }),
+    ];
+    const out = process(batch, { diets: ['Vegetarian'] });
+    expect(out.map((r) => r.title)).toEqual(['Veggie Ramen']);
   });
 
   it('should also drop recipes that reach beyond the on-hand ingredients', () => {
